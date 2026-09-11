@@ -221,8 +221,8 @@
           // untuk QR yang tidak ditemukan.
           showResult(
             "error",
-            "❌ CHECK-IN GAGAL",
-            `<div>${escapeHtml(result?.message || "Terjadi kesalahan.")}</div>`
+            "⚠️ CHECK-IN GAGAL",
+            `<div>${escapeHtml(result?.message || "SUDAH CHECK-IN | CEK GOOGLE SPREADSHEET PANITIA")}</div>`
           );
         }
       } finally {
