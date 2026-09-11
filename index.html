@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-in AN NASHIR ISLAMIC FAIR</title>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6f9;
+      color: #17202a;
+    }
+    .container {
+      max-width: 520px;
+      margin: auto;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    }
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: 23px;
+    }
+    .subtitle {
+      text-align: center;
+      margin: 7px 0 20px;
+      color: #667085;
+    }
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 14px;
+    }
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    #startBtn { background: #111827; color: white; }
+    #stopBtn { background: #e5e7eb; color: #111827; display: none; }
+    #result {
+      margin-top: 16px;
+      padding: 15px;
+      border-radius: 12px;
+      display: none;
+    }
+    .success { background: #ecfdf3; border: 1px solid #abefc6; }
+    .warning { background: #fffaeb; border: 1px solid #fedf89; }
+    .error { background: #fef3f2; border: 1px solid #fecdca; }
+    .loading { background: #eff8ff; border: 1px solid #b2ddff; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      padding: 6px 0;
+    }
+    .label { color: #667085; }
+    .value { font-weight: bold; text-align: right; }
+    .big {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .hint {
+      text-align: center;
+      color: #667085;
+      font-size: 13px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+  <div class="card">
+    <h1>AN NASHIR ISLAMIC FAIR</h1>
+    <div class="subtitle">Scanner Check-in Peserta</div>
+
+    <div id="reader"></div>
+
+    <button id="startBtn" onclick="startScanner()">📷 MULAI SCANNER</button>
+    <button id="stopBtn" onclick="stopScanner()">⏹ STOP SCANNER</button>
+
+    <div id="result"></div>
+
+    <div class="hint">
+      Izinkan akses kamera jika browser meminta permission.
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==========================================================
+  // PENTING:
+  // GANTI URL DI BAWAH DENGAN URL WEB APP APPS SCRIPT KAMU
+  // ==========================================================
+  const API_URL = "https://script.google.com/macros/s/AKfycbybBgmC-mG8dyZBxSjTDUFKFIOnIUDxn_HQL4S-zK4wDYf89GWjvji_-nfRXJ3CeCMK/exec";
+
+  let scanner = null;
+  let scanning = false;
+  let processing = false;
+
+  function showResult(type, title, html) {
+    const box = document.getElementById("result");
+    box.className = type;
+    box.innerHTML = `<div class="big">${title}</div>${html}`;
+    box.style.display = "block";
+  }
+
+  async function startScanner() {
+    if (API_URL === "PASTE_WEB_APP_URL_DI_SINI") {
+      showResult(
+        "error",
+        "⚠️ URL BELUM DIISI",
+        "Buka file index.html lalu masukkan URL Web App Apps Script kamu pada bagian <b>API_URL</b>."
+      );
+      return;
+    }
+
+    try {
+      document.getElementById("startBtn").style.display = "none";
+      document.getElementById("stopBtn").style.display = "block";
+      showResult("loading", "📷 Membuka kamera...", "Mohon tunggu.");
+
+      scanner = new Html5Qrcode("reader");
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        },
+        onScanSuccess,
+        () => {}
+      );
+
+      scanning = true;
+      showResult("loading", "📷 Scanner Aktif", "Arahkan kamera ke QR Code peserta.");
+    } catch (error) {
+      console.error(error);
+      showResult(
+        "error",
+        "❌ KAMERA TIDAK DAPAT DIAKSES",
+        "Pastikan website dibuka melalui <b>HTTPS</b>, browser memiliki izin kamera, dan kamera tidak sedang dipakai aplikasi lain.<br><br>" +
+        "Detail: " + escapeHtml(error.message || String(error))
+      );
+      document.getElementById("startBtn").style.display = "block";
+      document.getElementById("stopBtn").style.display = "none";
+    }
+  }
+
+  async function stopScanner() {
+    try {
+      if (scanner && scanning) {
+        await scanner.stop();
+        scanner.clear();
+      }
+    } catch (e) {
+      console.log(e);
+    }
+
+    scanning = false;
+    processing = false;
+    document.getElementById("startBtn").style.display = "block";
+    document.getElementById("stopBtn").style.display = "none";
+    showResult("loading", "Scanner Berhenti", "Tekan MULAI SCANNER untuk memulai lagi.");
+  }
+
+  function onScanSuccess(decodedText) {
+    if (processing) return;
+
+    const id = decodedText.trim();
+
+    // QR yang kita buat berisi REG-00001, REG-00002, dst.
+    if (!/^REG-\d+$/i.test(id)) {
+      showResult(
+        "error",
+        "❌ QR TIDAK VALID",
+        "QR Code ini bukan QR registrasi AN NASHIR ISLAMIC FAIR."
+      );
+      return;
+    }
+
+    processing = true;
+
+    showResult(
+      "loading",
+      "⏳ Memproses...",
+      "ID Registrasi: <b>" + escapeHtml(id) + "</b>"
+    );
+
+    // JSONP: bekerja lintas domain tanpa membutuhkan CORS.
+    const callbackName = "checkinCallback_" + Date.now();
+
+    window[callbackName] = function(result) {
+      try {
+        if (result && result.success) {
+          showResult(
+            "success",
+            "✅ CHECK-IN BERHASIL",
+            detailsHtml(result)
+          );
+        } else {
+          // checkIn() kamu diharapkan mengembalikan success:false
+          // untuk QR yang tidak ditemukan.
+          showResult(
+            "error",
+            "❌ CHECK-IN GAGAL",
+            `<div>${escapeHtml(result?.message || "Terjadi kesalahan.")}</div>`
+          );
+        }
+      } finally {
+        cleanupJsonp(callbackName, script);
+        // Beri jeda agar QR yang sama tidak langsung diproses berulang.
+        setTimeout(() => {
+          processing = false;
+        }, 2500);
+      }
+    };
+
+    const script = document.createElement("script");
+    script.src =
+      API_URL +
+      "?id=" + encodeURIComponent(id) +
+      "&callback=" + encodeURIComponent(callbackName);
+
+    script.onerror = function() {
+      cleanupJsonp(callbackName, script);
+      showResult(
+        "error",
+        "❌ GAGAL TERHUBUNG",
+        "Tidak dapat terhubung ke server check-in. Periksa URL Web App Apps Script."
+      );
+      setTimeout(() => processing = false, 2500);
+    };
+
+    document.body.appendChild(script);
+  }
+
+  function detailsHtml(result) {
+    const nama = result.nama ?? result.name ?? "-";
+    const jumlah = result.jumlah ?? result.peserta ?? result.total ?? "-";
+    const id = result.id ?? "-";
+    const waktu = result.waktu ?? result.time ?? "-";
+
+    return `
+      <div class="row"><span class="label">Nama</span><span class="value">${escapeHtml(nama)}</span></div>
+      <div class="row"><span class="label">Jumlah Peserta</span><span class="value">${escapeHtml(String(jumlah))}</span></div>
+      <div class="row"><span class="label">ID Registrasi</span><span class="value">${escapeHtml(id)}</span></div>
+      <div class="row"><span class="label">Waktu</span><span class="value">${escapeHtml(String(waktu))}</span></div>
+    `;
+  }
+
+  function cleanupJsonp(name, script) {
+    try {
+      delete window[name];
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    } catch (e) {}
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+</script>
+</body>
+</html>
